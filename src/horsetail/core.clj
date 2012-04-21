@@ -122,6 +122,32 @@
   (periodically-entity-touch-player-event)
   nil)
 
+(defn fish-damages-entity-event [evt fish target]
+  (if-let [shooter (.getShooter fish)]
+    (let [table {Cow Material/RAW_BEEF
+                 Pig Material/PORK
+                 Chicken Material/RAW_CHICKEN
+                 Zombie Material/LEATHER_CHESTPLATE
+                 Skeleton Material/BOW
+                 Creeper Material/TNT
+                 CaveSpider Material/IRON_INGOT
+                 Spider Material/REDSTONE
+                 Sheep Material/BED
+                 Villager Material/LEATHER_LEGGINGS
+                 Silverfish Material/DIAMOND_PICKAXE}]
+      (if-let [m (last (first (filter #(instance? (first %) target) table)))]
+        (.dropItem (.getWorld target) (.getLocation target) (ItemStack. m 1))
+        (cond
+          (instance? Player target)
+          (do
+            (if-let [item (.getItemInHand target)]
+              (do
+                (.setItemInHand target (ItemStack. Material/AIR))
+                (.setItemInHand shooter item))))
+
+          :else
+          (.teleport target shooter))))))
+
 (defn player-attacks-chicken-event [_ player chicken]
   (when (not= 0 (rand-int 3))
     (let [location (.getLocation player)
