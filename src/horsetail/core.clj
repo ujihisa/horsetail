@@ -173,5 +173,6 @@
 
 (defonce swank* nil)
 (defn on-enable [plugin]
+  (.scheduleSyncRepeatingTask (Bukkit/getScheduler) plugin (fn [] (periodically)) 50 50)
   (when (nil? swank*)
     (def swank* (swank.swank/start-repl 4009))))
