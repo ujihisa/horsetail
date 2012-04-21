@@ -105,6 +105,46 @@
           (.setFoodLevel player 0))
         (instance? Player target) (touch-player target)))))
 
+(def chicken-attacking (atom 0))
+(defn chicken-touch-player [chicken player]
+  (when (not= @chicken-attacking 0)
+    (.teleport chicken (.getLocation player))
+    (.damage player 1 chicken)))
+
+(defn periodically-entity-touch-player-event []
+  (doseq [player (Bukkit/getOnlinePlayers)]
+    (let [entities (.getNearbyEntities player 2 2 2)
+          chickens (filter #(instance? Chicken %) entities)]
+      (doseq [chicken chickens]
+        (chicken-touch-player chicken player)))))
+
+(defn periodically []
+  (periodically-entity-touch-player-event)
+  nil)
+
+(defn player-attacks-chicken-event [_ player chicken]
+  (when (not= 0 (rand-int 3))
+    (let [location (.getLocation player)
+          world (.getWorld location)]
+      (swap! chicken-attacking inc)
+      (future-call #(do
+                      (Thread/sleep 20000)
+                      (swap! chicken-attacking dec)))
+      (doseq [x [-2 -1 0 1 2] z [-2 -1 0 1 2]]
+        (let [chicken (.spawn world (.add (.clone location) x 3 z) Chicken)]
+          (future-call #(do
+                          (Thread/sleep 10000)
+                          (.remove chicken))))))))
+
+(defn entity-damage-event [evt]
+  (let [target (.getEntity evt)
+        attacker (when (instance? EntityDamageByEntityEvent evt)
+                   (.getDamager evt))]
+    (when (instance? Fish attacker)
+      (fish-damages-entity-event evt attacker target))
+    (when (and (instance? Player attacker) (instance? Chicken target))
+      (player-attacks-chicken-event evt attacker target))))
+
 (defonce swank* nil)
 (defn on-enable [plugin]
   (when (nil? swank*)
