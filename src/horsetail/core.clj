@@ -62,6 +62,49 @@
           (= (.getAction evt) org.bukkit.event.block.Action/RIGHT_CLICK_BLOCK)))
       (player-super-jump evt player))))
 
+(defn player-interact-entity-event [evt]
+  (let [target (.getRightClicked evt)]
+    (letfn [(d [n]
+              (.dropItem (.getWorld target)
+                         (.getLocation target)
+                         (ItemStack. n 1)))]
+      (cond
+        (and (= (.getType (.getItemInHand (.getPlayer evt))) Material/COAL)
+             (instance? PoweredMinecart target))
+        (do
+          (.setMaxSpeed target 5.0)
+          (let [v (.getVelocity target)
+                x (.getX v)
+                z (.getY v)
+                r2 (max (+ (* x x) (* z z)) 0.1)
+                new-x (* 2 (/ x r2))
+                new-z (* 2 (/ z r2))]
+            (future-call #(do
+                            (Thread/sleep 100)
+                            (.setVelocity target (org.bukkit.util.Vector. new-x (.getY v) new-z))))))
+        (and (instance? PigZombie target)
+             (= (.getTypeId (.getItemInHand (.getPlayer evt))) 296))
+        (do
+          (c/swap-entity target Pig)
+          (c/consume-item (.getPlayer evt)))
+        (and (instance? Pig target)
+             (= (.getTypeId (.getItemInHand (.getPlayer evt))) 367))
+        (do
+          (c/swap-entity target PigZombie)
+          (c/consume-item (.getPlayer evt)))
+        (instance? Chicken target) (d 66)
+        (instance? Cow target) (d 263)
+        (instance? Villager target) (d 92)
+        (instance? Creeper target) (d 289)
+        (and (instance? Zombie target) (not (instance? PigZombie target))) (d 367)
+        (instance? Skeleton target) (d 262)
+        (instance? Spider target) (d 287)
+        (instance? Squid target)
+        (let [player (.getPlayer evt)]
+          (.chat player "ikakawaiidesu")
+          (.setFoodLevel player 0))
+        (instance? Player target) (touch-player target)))))
+
 (defonce swank* nil)
 (defn on-enable [plugin]
   (when (nil? swank*)
