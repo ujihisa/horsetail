@@ -62,6 +62,9 @@
           (= (.getAction evt) org.bukkit.event.block.Action/RIGHT_CLICK_BLOCK)))
       (player-super-jump evt player))))
 
+(defn touch-player [target]
+  (.setFoodLevel target (dec (.getFoodLevel target))))
+
 (defn player-interact-entity-event [evt]
   (let [target (.getRightClicked evt)]
     (letfn [(d [n]
