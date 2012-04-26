@@ -34,6 +34,8 @@
 (defn player-interact-event [evt]
   (let [player (.getPlayer evt)]
     (cond
+      (= (.getAction evt) org.bukkit.event.block.Action/PHYSICAL)
+      (teleport-up player (.getClickedBlock evt))
       (and
         (= (.. player (getItemInHand) (getType)) Material/GLASS_BOTTLE)
         (or
@@ -46,7 +48,12 @@
         (or
           (= (.getAction evt) org.bukkit.event.block.Action/LEFT_CLICK_AIR)
           (= (.getAction evt) org.bukkit.event.block.Action/LEFT_CLICK_BLOCK)))
-      (.throwSnowball player)
+      (if (empty? (.getEnchantments (.getItemInHand player)))
+        (let [snowball (.launchProjectile player Snowball)]
+          (swap! special-snowball-set conj snowball)
+          (.setVelocity snowball (.multiply (.getVelocity snowball) 3)))
+        (let [arrow (.launchProjectile player Arrow)]
+          (.setVelocity arrow (.multiply (.getVelocity arrow) 3))))
       (and
         (= (.. evt (getMaterial)) Material/MILK_BUCKET)
         (or
@@ -65,6 +72,41 @@
 (defn touch-player [target]
   (.setFoodLevel target (dec (.getFoodLevel target))))
 
+(defn teleport-machine? [loc]
+  (=
+    (for [x [-1 0 1] z [-1 0 1]]
+      (if (and (= x 0) (= z 0))
+        'any
+        (.getType (.getBlock (.add (.clone loc) x 0 z)))))
+    (list Material/GLOWSTONE Material/GLOWSTONE Material/GLOWSTONE
+          Material/GLOWSTONE 'any Material/GLOWSTONE
+          Material/GLOWSTONE Material/GLOWSTONE Material/GLOWSTONE)))
+
+(defn teleport-up [entity block]
+  (when (#{Material/STONE_PLATE Material/WOOD_PLATE} (.getType block))
+    (let [entity-loc (.getLocation entity)
+          loc (.add (.getLocation block) 0 -1 0)]
+      (when (teleport-machine? loc)
+        (when (instance? Player entity)
+          (.sendMessage entity "teleport up!"))
+        (future-call #(let [newloc (.add (.getLocation entity) 0 30 0)]
+                        (Thread/sleep 10)
+                        (cond
+                          (= (.getType block) Material/STONE_PLATE)
+                          (.teleport entity newloc)
+                          (= (.getType block) Material/WOOD_PLATE)
+                          (c/add-velocity entity 0 1.5 0))
+                        (.playEffect (.getWorld entity-loc) (.add entity-loc 0 1 0) org.bukkit.Effect/BOW_FIRE nil)
+                        (.playEffect (.getWorld newloc) newloc org.bukkit.Effect/BOW_FIRE nil)
+                        (.playEffect (.getWorld entity-loc) entity-loc org.bukkit.Effect/ENDER_SIGNAL nil)
+                        (.playEffect (.getWorld newloc) newloc org.bukkit.Effect/ENDER_SIGNAL nil)))))))
+
+(defn entity-interact-physical-event [evt entity]
+  (teleport-up entity (.getBlock evt)))
+
+(defn entity-interact-event [evt]
+  (let [entity (.getEntity evt)]
+    (entity-interact-physical-event evt entity)))
 (defn player-interact-entity-event [evt]
   (let [target (.getRightClicked evt)]
     (letfn [(d [n]
